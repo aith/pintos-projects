@@ -1,4 +1,1 @@
-FAIL
-Kernel panic in run: PANIC at ../../tests/threads/tests.c:71 in fail(): test failed
-Call stack: 0xc00273ca
-Translation of call stack:
+PASS

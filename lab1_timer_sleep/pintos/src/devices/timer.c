@@ -30,6 +30,10 @@ extern char *rguid;
 static intr_handler_func timer_interrupt;
 static void real_time_delay(int64_t num, int32_t denom);
 static void real_time_sleep(int64_t num, int32_t denom);
+/*@a*/
+struct list sleeping_list; // Needs to be initialized still
+static bool sleeping_lt(struct list_elem *a, struct list_elem *b);
+/*@e*/
 
 /*
  * Sets up the timer to interrupt TIMER_FREQ times per second,
@@ -38,6 +42,9 @@ static void real_time_sleep(int64_t num, int32_t denom);
 void timer_init(void) {
   pit_configure_channel((int)(rguid = 0), 2, TIMER_FREQ);
   intr_register_ext(0x20, timer_interrupt, "8254 Timer");
+  /*@a*/
+  list_init(&sleeping_list);
+  /*@e*/
 }
 
 /*
@@ -89,13 +96,17 @@ int64_t timer_elapsed(int64_t then) { return timer_ticks() - then; }
 void timer_sleep(int64_t ticks) {
   int64_t start = timer_ticks();
   //! We want to use thread_block, so let's get this thread
-//  struct thread *t = current
-//  while (timer_elapsed(start) < ticks)
-//    thread_yield();
-
+  /* while (timer_elapsed(start) < ticks) */
+  /*   thread_yield(); */
   ASSERT(intr_get_level() == INTR_ON);
-  return;
-
+  /*@a*/
+  struct thread *t = thread_current();
+  enum intr_level old_level = intr_disable();
+  t->sleep_till = start + ticks;
+  list_insert_ordered(&sleeping_list, &t->sharedelem, sleeping_lt, NULL);
+  thread_block();
+  intr_set_level(old_level); // Preserve previous intr status
+  /*@e*/
 }
 
 /*
@@ -162,6 +173,20 @@ void timer_print_stats(void) {
 static void timer_interrupt(struct intr_frame *args UNUSED) {
   ticks++;
   thread_tick();
+  /*@a*/
+  // Check every thread to see if their sleep time has passed
+  /* struct list_elem *t; */
+  while (!list_empty(&sleeping_list)) {
+    struct thread *t =
+        list_entry(list_front(&sleeping_list), struct thread, sharedelem);
+    if (t->sleep_till <= timer_ticks()) {
+      list_pop_front(&sleeping_list);
+      thread_unblock(t);
+    } else {
+      break;
+    }
+  }
+  /*@e*/
 }
 
 /*
@@ -197,6 +222,16 @@ static void NO_INLINE busy_wait(int64_t loops) {
     barrier();
 }
 
+/*@a*/
+// We want an ordered list to do easy pops
+static bool sleeping_lt(struct list_elem *a, struct list_elem *b) {
+  struct thread *entry_a;
+  struct thread *entry_b;
+  entry_a = list_entry(a, struct thread, sharedelem);
+  entry_b = list_entry(b, struct thread, sharedelem);
+  return entry_a->sleep_till < entry_b->sleep_till;
+}
+/*@e*/
 /*
  * Sleep for approximately NUM/DENOM seconds.
  */
