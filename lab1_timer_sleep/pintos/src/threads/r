@@ -1,3 +1,0 @@
-#!/bin/bash
-
-../utils/pintos -v -k -T 20 --qemu -- -q run $1
