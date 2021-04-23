@@ -1,8 +1,8 @@
-/* 
+/*
  * This file is derived from source code for the Pintos
  * instructional operating system which is itself derived
- * from the Nachos instructional operating system. The 
- * Nachos copyright notice is reproduced in full below. 
+ * from the Nachos instructional operating system. The
+ * Nachos copyright notice is reproduced in full below.
  *
  * Copyright (C) 1992-1996 The Regents of the University of California.
  * All rights reserved.
@@ -27,7 +27,7 @@
  * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
  * MODIFICATIONS.
  *
- * Modifications Copyright (C) 2017-2021 David C. Harrison. 
+ * Modifications Copyright (C) 2017-2021 David C. Harrison.
  * All rights reserved.
  */
 
@@ -38,18 +38,17 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/* 
+/*
  * Initializes condition variable COND.  A condition variable
  * allows one piece of code to signal a condition and cooperating
- * code to receive the signal and act upon it. 
+ * code to receive the signal and act upon it.
  */
-void condvar_init(struct condvar *cond)
-{
+void condvar_init(struct condvar *cond) {
   ASSERT(cond != NULL);
   list_init(&cond->waiters);
 }
 
-/* 
+/*
  * Atomically releases LOCK and waits for COND to be signaled by
  * some other piece of code.  After COND is signaled, LOCK is
  * reacquired before returning.  LOCK must be held before calling
@@ -69,10 +68,28 @@ void condvar_init(struct condvar *cond)
  * This function may sleep, so it must not be called within an
  * interrupt handler.  This function may be called with
  * interrupts disabled, but interrupts will be turned back on if
- * we need to sleep. 
+ * we need to sleep.
  */
-void condvar_wait(struct condvar *cond, struct lock *lock)
-{
+
+/*@a*/
+/* Compares the priority of each of the condvar's semaphore's first thread's
+ * priority */
+bool condvar_priority_gt(const struct list_elem *a, const struct list_elem *b,
+                         void *aux) {
+  struct semaphore *as = list_entry(a, struct semaphore, condvarelem);
+  struct semaphore *bs = list_entry(b, struct semaphore, condvarelem);
+  if (list_empty(&as->waiters)) {
+    return false;
+  } else if (list_empty(&bs->waiters)) {
+    return true;
+  } else {
+    return thread_priority_gt(list_front(&as->waiters),
+                              list_front(&bs->waiters));
+  }
+}
+/*@e*/
+
+void condvar_wait(struct condvar *cond, struct lock *lock) {
   ASSERT(cond != NULL);
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
@@ -86,44 +103,44 @@ void condvar_wait(struct condvar *cond, struct lock *lock)
   lock_acquire(lock);
 }
 
-/* 
+/*
  * If any threads are waiting on COND(protected by LOCK), then
  * this function signals one of them to wake up from its wait.
  * LOCK must be held before calling this function.
  *
  * An interrupt handler cannot acquire a lock, so it does not
  * make sense to try to signal a condition variable within an
- * interrupt handler. 
+ * interrupt handler.
  */
-void condvar_signal(struct condvar *cond, struct lock *lock UNUSED)
-{
+void condvar_signal(struct condvar *cond, struct lock *lock UNUSED) {
   ASSERT(cond != NULL);
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
   ASSERT(lock_held_by_current_thread(lock));
 
-  if (!list_empty(&cond->waiters))
-  {
-    semaphore_up(list_entry(
-        list_pop_front(&cond->waiters), struct semaphore, condvarelem));
+  if (!list_empty(&cond->waiters)) {
+    /*@a We sort rather than insert_ordered because the threads' priority can
+     * change without updating its position in the condvar's list*/
+    list_sort(&cond->waiters, condvar_priority_gt, NULL);
+    /*@e*/
+    semaphore_up(list_entry(list_pop_front(&cond->waiters), struct semaphore,
+                            condvarelem));
   }
 }
 
-/* 
+/*
  * Wakes up all threads, if any, waiting on COND(protected by
  * LOCK).  LOCK must be held before calling this function.
  *
  * An interrupt handler cannot acquire a lock, so it does not
  * make sense to try to signal a condition variable within an
- * interrupt handler. 
+ * interrupt handler.
  */
-void condvar_broadcast(struct condvar *cond, struct lock *lock)
-{
+void condvar_broadcast(struct condvar *cond, struct lock *lock) {
   ASSERT(cond != NULL);
   ASSERT(lock != NULL);
 
-  while (!list_empty(&cond->waiters))
-  {
+  while (!list_empty(&cond->waiters)) {
     condvar_signal(cond, lock);
   }
 }
