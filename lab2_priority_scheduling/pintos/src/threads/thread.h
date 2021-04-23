@@ -92,7 +92,13 @@ struct thread {
 
   // Owned by thread.c. and semephore.c
   struct list_elem sharedelem; // For ready list and semaphore wait list
-  int sleep_till;              //@
+  /*@a*/
+  struct lock *lock_waiting_on;     // The lock this thread waits on.
+  struct list priority_donor_locks; // List of locks that donated to this
+                                    // thread's priority
+  int base_priority;                // The priority before given a donation
+  int sleep_till;                   // Time frame to sleep till
+  /*@e*/
 
   // Change nothing and add nothing below this line
 #ifdef USERPROG
