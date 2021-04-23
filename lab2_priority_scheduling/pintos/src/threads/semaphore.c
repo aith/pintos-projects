@@ -93,9 +93,13 @@ void semaphore_up(struct semaphore *semaphore) {
 
   old_level = intr_disable();
   if (!list_empty(&semaphore->waiters)) {
+    /*@a*/
     thread_unblock(list_entry(list_pop_front(&semaphore->waiters),
                               struct thread, sharedelem));
+    /*@e*/
   }
   semaphore->value++;
+  thread_preempt(); // Since the unblocked thread might have a higher priority
+                    // than the running thread
   intr_set_level(old_level);
 }

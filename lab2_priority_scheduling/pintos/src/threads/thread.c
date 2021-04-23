@@ -239,6 +239,10 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
   /* Add to run queue. */
   thread_unblock(t);
 
+  /*@a This preemption cannot be run in thread_unblock*/
+  thread_preempt();
+  /*@e*/
+
   return tid;
 }
 
@@ -288,7 +292,6 @@ void thread_unblock(struct thread *t) {
 
   /*@a Let's sort the ready_list here here */
   list_insert_ordered(&ready_list, &t->sharedelem, thread_priority_gt, NULL);
-  thread_preempt();
   /*@e*/
 
   // list_push_back(&ready_list, &t->sharedelem);
