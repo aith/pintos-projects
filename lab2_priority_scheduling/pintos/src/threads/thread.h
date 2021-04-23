@@ -110,14 +110,7 @@ struct thread {
 extern bool thread_mlfqs;
 
 /*@a*/
-// We want an ordered list to do easy pops
-static bool thread_priority_gt(struct list_elem *a, struct list_elem *b) {
-  struct thread *entry_a;
-  struct thread *entry_b;
-  entry_a = list_entry(a, struct thread, sharedelem);
-  entry_b = list_entry(b, struct thread, sharedelem);
-  return entry_a->priority > entry_b->priority;
-}
+bool thread_priority_gt(const struct list_elem *a, const struct list_elem *b);
 /*@e*/
 
 void thread_init(void);
@@ -129,6 +122,7 @@ void thread_print_stats(void);
 typedef void thread_func(void *aux);
 tid_t thread_create(const char *name, int priority, thread_func *, void *);
 
+void thread_preempt(void);
 void thread_block(void);
 void thread_unblock(struct thread *);
 

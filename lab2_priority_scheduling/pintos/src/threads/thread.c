@@ -140,10 +140,14 @@ void thread_start(void) {
   /* Create the idle thread. */
   struct semaphore idle_started;
   semaphore_init(&idle_started, 0);
-  thread_create("idle", PRI_DEFAULT, idle, &idle_started);
+  tid_t t = thread_create("idle", PRI_DEFAULT, idle, &idle_started);
 
   /* Start preemptive thread scheduling. */
   intr_enable();
+
+  /*@a*/
+  thread_preempt();
+  /*@e*/
 
   /* Wait for the idle thread to initialize idle_thread. */
   semaphore_down(&idle_started);
@@ -255,6 +259,17 @@ void thread_block(void) {
   schedule();
 }
 
+/*@a*/
+/* Comparison operator for thread priority */
+bool thread_priority_gt(const struct list_elem *a, const struct list_elem *b) {
+  struct thread *entry_a;
+  struct thread *entry_b;
+  entry_a = list_entry(a, struct thread, sharedelem);
+  entry_b = list_entry(b, struct thread, sharedelem);
+  return entry_a->priority > entry_b->priority;
+}
+/*@e*/
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -270,13 +285,32 @@ void thread_unblock(struct thread *t) {
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
+
   /*@a Let's sort the ready_list here here */
   list_insert_ordered(&ready_list, &t->sharedelem, thread_priority_gt, NULL);
+  thread_preempt();
   /*@e*/
+
   // list_push_back(&ready_list, &t->sharedelem);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
+
+/*@a
+ * Check if the running thread has the highest priority. If not, have it yield
+ * the CPU. */
+void thread_preempt(void) {
+  if (!list_empty(&ready_list)) {
+    /* Because of the ordered insert, the first element will be the highest
+     * priority thread */
+    struct thread *highest_priority_thread =
+        list_entry(list_front(&ready_list), struct thread, sharedelem);
+    if (thread_get_priority() < highest_priority_thread->priority) {
+      thread_yield();
+    }
+  }
+}
+/*@e*/
 
 /* Returns the name of the running thread. */
 const char *thread_name(void) { return thread_current()->name; }
@@ -329,10 +363,10 @@ void thread_yield(void) {
   ASSERT(!intr_context());
 
   old_level = intr_disable();
-  if (cur != idle_thread)
-    // list_push_back(&ready_list, &cur->sharedelem);
+  if (cur != idle_thread) {
     list_insert_ordered(&ready_list, &cur->sharedelem, thread_priority_gt,
                         NULL);
+  }
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
