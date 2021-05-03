@@ -1,0 +1,38 @@
+qemu-system-i386 -device isa-debug-exit -drive format=raw,media=disk,index=0,file=/tmp/xFCDVKhKZ5.dsk -m 4 -net none -nographic -monitor null
+PiLo hda1
+Loading...........
+Kernel command line: -q run priority-semaphore
+Pintos booting with 3,968 kB RAM...
+367 pages available in kernel pool.
+367 pages available in user pool.
+Calibrating timer...  419,020,800 loops/s.
+Boot complete.
+Executing 'priority-semaphore':
+(priority-semaphore) begin
+(priority-semaphore) Thread priority 30 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 29 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 28 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 27 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 26 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 25 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 24 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 23 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 22 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) Thread priority 21 woke up.
+(priority-semaphore) Back in main thread.
+(priority-semaphore) end
+Execution of 'priority-semaphore' complete.
+Timer: 44 ticks
+Thread: 0 idle ticks, 44 kernel ticks, 0 user ticks
+Console: 1317 characters output
+Keyboard: 0 keys pressed
+Powering off...

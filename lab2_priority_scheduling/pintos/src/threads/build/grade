@@ -1,0 +1,72 @@
+TOTAL TESTING SCORE: 92.5%
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+SUMMARY BY TEST SET
+
+Test Set                                      Pts Max  % Ttl  % Max
+--------------------------------------------- --- --- ------ ------
+tests/threads/Rubric.alarm                    100/100   0.0%/  0.0%
+tests/threads/Rubric.basic                     40/ 40  40.0%/ 40.0%
+tests/threads/Rubric.advanced                  30/ 30  30.0%/ 30.0%
+tests/threads/Rubric.stretch                   35/ 40  17.5%/ 20.0%
+tests/threads/Rubric.extreme                    5/ 10   5.0%/ 10.0%
+--------------------------------------------- --- --- ------ ------
+Total                                                  92.5%/100.0%
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+SUMMARY OF INDIVIDUAL TESTS
+
+Functionality and robustness of alarm clock (tests/threads/Rubric.alarm):
+	     5/ 5 tests/threads/alarm-single
+	     5/ 5 tests/threads/alarm-multiple
+	     5/ 5 tests/threads/alarm-simultaneous
+	     5/ 5 tests/threads/alarm-zero
+	     5/ 5 tests/threads/alarm-negative
+	    75/75 tests/threads/alarm-efficient
+
+	- Section summary.
+	      6/  6 tests passed
+	    100/100 points subtotal
+
+Basic: Priority based ready queue (tests/threads/Rubric.basic):
+	    20/20 tests/threads/alarm-priority
+	    10/10 tests/threads/priority-preempt
+	     5/ 5 tests/threads/priority-change
+	     5/ 5 tests/threads/priority-fifo
+
+	- Section summary.
+	      4/  4 tests passed
+	     40/ 40 points subtotal
+
+Advanced: Priority waiting for locks, semaphores, and condition variables (tests/threads/Rubric.advanced):
+	    15/15 tests/threads/priority-semaphore
+	    15/15 tests/threads/priority-condvar
+
+	- Section summary.
+	      2/  2 tests passed
+	     30/ 30 points subtotal
+
+Stretch: Single level priority donation, including multiple donations (tests/threads/Rubric.stretch):
+	     5/ 5 tests/threads/priority-donate-single
+	     5/ 5 tests/threads/priority-donate-one
+	     5/ 5 tests/threads/priority-donate-lower1
+	     5/ 5 tests/threads/priority-donate-lower2
+	     5/ 5 tests/threads/priority-donate-multiple1
+	     5/ 5 tests/threads/priority-donate-multiple2
+	  ** 0/ 5 tests/threads/priority-donate-semaphore
+	     5/ 5 tests/threads/priority-donate-condvar
+
+	- Section summary.
+	      7/  8 tests passed
+	     35/ 40 points subtotal
+
+Extreme: Nested and chained priority donation (tests/threads/Rubric.extreme):
+	     5/ 5 tests/threads/priority-donate-nest
+	  ** 0/ 5 tests/threads/priority-donate-chain
+
+	- Section summary.
+	      1/  2 tests passed
+	      5/ 10 points subtotal
+

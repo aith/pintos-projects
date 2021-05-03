@@ -59,10 +59,21 @@ void lock_init(struct lock *lock) {
   ASSERT(lock != NULL);
 
   lock->holder = NULL;
+  lock->priority = -1;
   semaphore_init(&lock->semaphore, 1);
 }
 
 /*@a*/
+bool lock_priority_gt(const struct list_elem *a, const struct list_elem *b,
+                      void *aux) {
+  struct lock *entry_a = list_entry(a, struct lock, list_elem);
+  struct lock *entry_b = list_entry(b, struct lock, list_elem);
+  return entry_a->priority > entry_b->priority;
+}
+
+/* A recursive function that passes locks' priorities down until the last
+lock.
+ */
 void trickle_priority_donation(struct thread *initial_thread,
                                int new_priority) {
   struct lock *lock_current = initial_thread->lock_waiting_on;
@@ -78,11 +89,6 @@ void trickle_priority_donation(struct thread *initial_thread,
 /*@a*/
 void give_priority_donation(struct lock *lock) {
   struct thread *receiver = lock->holder;
-
-  //
-  /* trickle_priority_donation(lock, thread_get_priority()); */
-  /* thread_current()->lock_waiting_on = lock; */
-
   if (thread_get_priority() > receiver->priority) {
     receiver->priority = thread_get_priority();
   }
@@ -104,62 +110,79 @@ void lock_acquire(struct lock *lock) {
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
   ASSERT(!lock_held_by_current_thread(lock));
-  /*@a*/
+  /*@a* Donation! /
   /* If the thread attempts to acquire a lock that's held, try to donate
-   * the current running thread's priority to the the holder before blocking, as
+   * the current running thread's priority to the the holder before blocking,
    * demonstrated in https://www.youtube.com/watch?v=dQwiWcHqS_8 and in
    * https://www.youtube.com/watch?v=nVUQ4f1-roM */
-  /* if (lock->holder != NULL) { */
-  /*   give_priority_donation(lock); */
-  /* } */
-  // TODO update this and cascade
-  struct thread *holder = lock->holder;
-  if (!find_and_update_lock_priority(lock, &t->donors, holder)) {
-    /* donate_cascade(t, thread_get_priority()); */
-    thread_current()->lock_waiting_on = lock;
-    lock->priority = thread_get_priority();
-    list_insert_ordered(&holder->donors, &lock->elem, lock_priority_gt, NULL);
+  if (lock->holder == NULL) {
+    /* Acquire the lock since its untaken */
+  } else {
+    /* Do donation to get lock */
+    struct thread *holder = lock->holder;
+    /* Checks if the wanted lock is already one of the holder's donors. */
+    if (find_lock(lock, &holder->priority_donor_locks)) {
+      /* Reinvoke donation */
+      lock->priority = holder->priority; // Donate priority
+    } else {
+      /* Donate priority to holder from current thread */
+      trickle_priority_donation(holder, thread_get_priority());
+      thread_current()->lock_waiting_on = lock;
+      lock->priority = thread_get_priority(); // Donate priority
+      list_insert_ordered(
+          &holder->priority_donor_locks,
+          &lock->list_elem, // Keep track of the donors, add here
+          lock_priority_gt, NULL);
+    }
+    holder->priority = thread_get_priority(); // Donation!
+    thread_preempt();
   }
   semaphore_down(&lock->semaphore);
   lock->holder = thread_current();
-  thread_preempt();
   /*@e*/
 }
 
 /*@a*/
-void lock_remove_from_list(struct lock *lock, struct list *l) {
-  for (e = list_begin(&l); e != list_end(&l); e = list_next(e)) {
-    struct lock *curr_lock = list_entry(e, struct lock, elem);
+bool lock_remove_from_list(struct lock *lock, struct list *l) {
+  for (struct list_elem *curr_elem = list_begin(l); curr_elem != list_end(l);
+       curr_elem = list_next(curr_elem)) {
+    struct lock *curr_lock = list_entry(curr_elem, struct lock, list_elem);
     if (lock == curr_lock) {
-      list_remove(e);
-      return;
-    }
-  }
-}
-
-bool find_and_update_lock_priority(struct lock *lock, struct list *l,
-                                   struct thread *t) {
-  for (struct list_elem *cur_elem = list_begin(l); cur_elem != list_end(l);
-       cur_elem = list_next(l)) {
-    struct lock *cur_lock = list_entry(cur_lock, struct lock, elem);
-    if (lock == cur_lock) {
-      cur_lock->priority = t->priority;
+      list_remove(curr_elem);
       return true;
     }
   }
   return false;
 }
 
-void thread_revoke_donated_priority() {
+/* Searches for lock in list */
+bool find_lock(struct lock *lock, struct list *l) {
+  bool result = false;
+  for (struct list_elem *curr_elem = list_begin(l); curr_elem != list_end(l);
+       curr_elem = list_next(curr_elem)) {
+    struct lock *donor_lock = list_entry(curr_elem, struct lock, list_elem);
+    if (lock == donor_lock) {
+      result = true;
+      break;
+    }
+  }
+  return result;
+}
+
+void thread_revoke_donated_priority(void) {
   thread_current()->priority = thread_current()->base_priority;
 }
 
-void thread_update_donated_priority() {
+/* If thread has donors, take the priority of highest one */
+bool thread_update_donated_priority(void) {
   if (!list_empty(&thread_current()->priority_donor_locks)) {
-    struct lock *highest_priority_lock = list_entry(
-        list_front(&thread_current()->priority_donor_locks), struct lock, elem);
+    struct lock *highest_priority_lock =
+        list_entry(list_front(&thread_current()->priority_donor_locks),
+                   struct lock, list_elem);
     thread_current()->priority = highest_priority_lock->priority;
+    return true;
   }
+  return false;
 }
 /*@e*/
 
@@ -172,26 +195,19 @@ void thread_update_donated_priority() {
  */
 void lock_release(struct lock *lock) {
   ASSERT(lock != NULL);
-  ASSERT(lock_held_by_current_thread(lock));
-
-  /*@a*/
-  /* If there's a list of lock donors, then this lock has inherited a donation.
-   */
-  /* lock->holder->priority = lock->holder->base_priority; */
-
-  if (!list_empty(&(lock->holder->priority_donor_locks))) {
-    lock_remove_from_list(lock, &thread_current()->priority_donor_locks);
-    thread_revoke_donated_priority(); // Thread loses donated priority and goes
-                                      // back to base
-    thread_update_donated_priority(); // Get donation from first in donor list
-    thread_preempt();
-  }
-  /* } */
-  /*@e*/
+  ASSERT(lock_held_by_current_thread(lock)); /* need to use this reseting */
+  struct thread *prev = lock->holder;
   lock->holder = NULL;
   semaphore_up(&lock->semaphore);
   /*@a*/
-  /* if(!list_empty(&prev_lock_holder->donors)) { */
+  /* If there are donor locks, then give up the donation */
+  if (!list_empty(&prev->priority_donor_locks)) {
+    lock_remove_from_list(lock, &thread_current()->priority_donor_locks);
+    thread_revoke_donated_priority(); // Thread loses donated priority and goes
+                                      // back to base
+    thread_update_donated_priority(); // Get new donation if donors still exist
+    thread_preempt();
+  }
   thread_preempt(); // Make sure the current_thread is reset
   /*@e*/
 }

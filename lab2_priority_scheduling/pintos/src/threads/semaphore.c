@@ -70,7 +70,6 @@ void semaphore_down(struct semaphore *sema) {
 
   enum intr_level old_level = intr_disable();
   while (sema->value == 0) { // Busy-wait sleep
-    // list_push_back(&sema->waiters, &thread_current()->sharedelem);
     list_insert_ordered(&sema->waiters, &thread_current()->sharedelem,
                         thread_priority_gt, NULL);
     thread_block(); /* Turn off the thread running this code. Upon reawaking,

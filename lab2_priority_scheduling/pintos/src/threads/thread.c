@@ -308,7 +308,7 @@ void thread_preempt(void) {
      * priority thread */
     struct thread *highest_priority_thread =
         list_entry(list_front(&ready_list), struct thread, sharedelem);
-    if (thread_get_priority() < highest_priority_thread->priority) {
+    if (thread_get_priority() <= highest_priority_thread->priority) {
       thread_yield();
     }
   }
@@ -390,15 +390,14 @@ void thread_foreach(thread_action_func *func, void *aux) {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
-  /* thread_current()->priority = new_priority; */
   /*@a*/
   thread_current()->base_priority = new_priority;
-  /* thread_current()->priority = new_priority; */
-  if (new_priority > thread_current()->priority) {
+  if (!(new_priority < thread_current()->priority &&
+        !list_empty(&thread_current()->priority_donor_locks))) {
     thread_current()->priority = new_priority;
   }
-  /*@e*/
   thread_preempt();
+  /*@e*/
 }
 
 /* Returns the current thread's priority. */
@@ -501,6 +500,7 @@ static void init_thread(struct thread *t, const char *name, int priority) {
   t->priority = priority;
   /*@a*/
   t->base_priority = priority;
+  t->lock_waiting_on = NULL;
   list_init(&t->priority_donor_locks);
   /*@e*/
   t->magic = THREAD_MAGIC;
